@@ -50,19 +50,21 @@
 
 | # | Tên tài liệu | Nguồn | Số ký tự | Metadata đã gán |
 |---|--------------|-------|----------|-----------------|
-| 1 | `Braised_Tofu.md` | [vietnamtourism](https://www.vietnamtourism.org.vn/vietnam-cuisine/vietnamese-recipes.html) | 1208 | `category: main_dish`, `difficulty: easy` |
-| 2 | `Duck_Porridge.md` | [vietnamtourism](https://www.vietnamtourism.org.vn/vietnam-cuisine/vietnamese-recipes.html) | 2470 | `category: main_dish`, `difficulty: medium` |
-| 3 | `Savory_Pancakes.md` | [vietnamtourism](https://www.vietnamtourism.org.vn/vietnam-cuisine/vietnamese-recipes.html) | 1970 | `category: main_dish`, `difficulty: hard` |
-| 4 | `Grilled_Snails.md` | [vietnamtourism](https://www.vietnamtourism.org.vn/vietnam-cuisine.html) | 1012 | `category: seafood`, `difficulty: easy` |
-| 5 | `Orange_Fruit_Skin_Jam.md` | [vietnamtourism](https://www.vietnamtourism.org.vn/vietnam-cuisine/vietnamese-recipes.html) | 1225 | `category: dessert`, `difficulty: easy` |
+| 1 | Savory Pancakes (Bánh Khọt) | vietnamtourism | 1981 | source, extension, category, difficulty, doc_id, chunk_index |
+| 2 | Braised Tofu with Quail Eggs | vietnamtourism | 1210 | source, extension, category, difficulty, doc_id, chunk_index |
+| 3 | Duck Porridge & Salad (Cháo Gỏi Vịt) | vietnamtourism | 2470 | source, extension, category, difficulty, doc_id, chunk_index |
+| 4 | Grilled Snails with Salt & Chili | vietnamtourism | 1014 | source, extension, category, difficulty, doc_id, chunk_index |
+| 5 | Orange Fruit Skin Jam (Mứt Vỏ Cam) | vietnamtourism | 1226 | source, extension, category, difficulty, doc_id, chunk_index |
 
 ### Metadata Schema
-| Trường metadata | Kiểu           | Ví dụ giá trị                              | Tại sao hữu ích cho retrieval?                         |
-|-----------------|----------------|--------------------------------------------|--------------------------------------------------------|
-| title           | string         | "Braised Tofu with Quail Eggs"             | Là khóa chính để match query dạng “tìm món X”          |
-| category        | string         | "main dish", "dessert", "snack"            | Giúp chọn lọc theo loại món (ví dụ: “món tráng miệng”) |
-| ingredients     | list[string]   | ["tofu", "quail eggs", "fish sauce"]       | Cho phép tìm kiếm theo nguyên liệu (“món có trứng cút”)|
-| process         | list[string]   | ["Boil eggs", "Cook tofu", "..."]          | Dùng để tìm kiếm ngữ nghĩa theo hành động nấu ăn       |
+| Trường metadata | Kiểu   | Ví dụ giá trị | Tại sao hữu ích cho retrieval? |
+|-----------------|--------|---------------|-------------------------------|
+| source | string | "Braised_Tofu" | Tên gốc document — dùng để trace kết quả về file nguồn |
+| extension | string | ".md" | Loại file — hỗ trợ filter theo định dạng nếu mix .md/.txt |
+| category | string | "main_dish", "seafood", "dessert" | Filter theo loại món — VD: chỉ tìm trong dessert hoặc seafood |
+| difficulty | string | "easy", "medium", "hard" | Filter theo độ khó — VD: chỉ tìm món dễ nấu |
+| doc_id | string | "Orange_Fruit_Skin_Jam" | ID gốc của document trước khi chunk — dùng để delete_document và group chunks cùng nguồn |
+| chunk_index | int | 0, 1, 2... | Vị trí chunk trong document — hỗ trợ debug và tái tạo thứ tự nội dung gốc |
 
 ---
 
@@ -112,12 +114,12 @@ class CustomRecipeChunker:
 
 ### So Sánh Với Thành Viên Khác
 
-| Thành viên | Strategy | Retrieval Score (/10) | Điểm mạnh | Điểm yếu |
-|-----------|----------|----------------------|-----------|----------|
-| Tôi | CustomRecipeChunker | 8/10 | Tách bạch hoàn hảo danh sách Nguyên liệu và từng Bước nấu, không bị cắt ngang câu chữ. | Dễ bị mất ngữ cảnh (Context Loss) do các chunk nhỏ không chứa tên món ăn. |
-| Dương Quang Đông | RecursiveChunker | 6/10 | Khá linh hoạt, ưu tiên tách theo đoạn văn nên giữ được ý tốt hơn FixedSize. | Đôi khi gom chung Nguyên liệu và Cách làm vào cùng một chunk gây nhiễu. |
-| Nguyễn Lê Trung | FixedSizeChunker | 4/10 | Dễ triển khai, kiểm soát chính xác dung lượng độ dài của mỗi chunk. | Cắt ngang từ vựng và câu chữ một cách vô lý, phá hỏng hoàn toàn ngữ nghĩa. |
-| Phạm Anh Dũng | SentenceChunker | 5/10 | Bảo toàn được ranh giới câu trọn vẹn, đọc mượt mà hơn FixedSize. | Xử lý danh sách nguyên liệu rất tệ (do thiếu dấu chấm câu), dễ làm phân mảnh các bước nấu. |
+| Thành viên | Strategy | Chunks | Q1 Top-1 | Q2 Top-1 | Q3 Top-1 | Q4 Top-1 | Q5 Top-1 | Top-3 Relevant |
+|-----------|----------|--------|----------|----------|----------|----------|----------|----------------|
+| Tôi (Vương Hoàng Giang) | CustomRecipeChunker (by header) | 39 | Braised_Tofu:1 (0.7420) ✓ | Grilled_Snails:5 (0.6438) △ | Duck_Porridge:5 (0.7667) ✓ | Orange_Fruit_Skin_Jam:6 (0.5260) ✓ | Savory_Pancakes:1 (0.6275) ✓ | **5/5** |
+| Phạm Anh Dũng | SentenceChunker (3 sentences) | 34 | Braised_Tofu:1 (0.7493) ✓ | Grilled_Snails:2 (0.6763) ✓ | Duck_Porridge:4 (–) ✓ | Orange_Fruit_Skin_Jam:5 (0.4988) ✓ | Savory_Pancakes:1 (0.5978) ✓ | **5/5** |
+| Dương Quang Đông | RecursiveChunker (300) | 39 | Braised_Tofu:3 (0.7287) ✓ | Grilled_Snails:3 (0.7001) ✓ | Duck_Porridge:5 (0.7640) ✓ | Orange_Fruit_Skin_Jam:5 (0.5260) ✓ | Savory_Pancakes:4 (0.6530) ✓ | **5/5** |
+| Nguyễn Lê Trung | FixedSizeChunker (300/50) | 32 | Braised_Tofu:2 (0.7012) | Grilled_Snails:3 (0.7107) ✓ | Duck_Porridge:5 (0.6558) ✓ | Orange_Fruit_Skin_Jam:4 (0.4947) △ | Savory_Pancakes:2 (0.6186) ✓ | **5/5** |
 
 **Strategy nào tốt nhất cho domain này? Tại sao?**
 > *Đối với domain công thức nấu ăn, CustomRecipeChunker là chiến lược xuất sắc nhất. Dữ liệu này có cấu trúc định dạng rất rõ ràng (Semantic format). Việc chia chunk dựa trên tiêu đề (Headers/Steps) giúp bảo toàn trọn vẹn một bước hướng dẫn, mang lại độ chính xác cao hơn hẳn so với việc chia cắt mù quáng theo số lượng ký tự.*
